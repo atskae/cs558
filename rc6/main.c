@@ -4,6 +4,7 @@
 #include <stdint.h> // ensures byte-sizes of data types
 #include <ctype.h> // tolower()
 #include <string.h> 
+#include <math.h>
 
 /*
 
@@ -13,32 +14,54 @@
 #define ENCRYPT 1
 #define DECRYPT 0
 
-#define WORD_SIZE 32
+#define WORD_SIZE 32 // in bits
 #define NUM_ROUNDS 20
 
 // RC6-w/r/b ; RC6-<word_size>/<num_rounds>/<key_length>
+char action = ENCRYPT;
 unsigned char* key = NULL; // can vary in size
 int key_size = 0; // in bytes
-char action = ENCRYPT;
 unsigned char* text = NULL; // text to encrypt or decrypt
 int text_size = 0;
 
 // Four 32-bit registers for encryption/decryption
-int32_t reg_A = 0x00000000;
-int32_t reg_B = 0x00000000;
-int32_t reg_C = 0x00000000;
-int32_t reg_D = 0x00000000;
+uint32_t reg_A = 0x00000000;
+uint32_t reg_B = 0x00000000;
+uint32_t reg_C = 0x00000000;
+uint32_t reg_D = 0x00000000;
 
 // Key schedule for RC6
-int32_t round_keys[2*NUM_ROUNDS + 4]; // S array from paper
-int32_t P32 = 0xB7E15163; // "magical constant"
-int32_t Q32 = 0x9E3779B9; // "magical constant"
+uint32_t round_keys[2*NUM_ROUNDS + 4]; // S array from paper
+uint32_t* L; // user-key with zero-byte padding in array format, little-endian format
+uint32_t P32 = 0xB7E15163; // "magical constant"
+uint32_t Q32 = 0x9E3779B9; // "magical constant"
+
 
 /*
 
 	Helper functions
 
 */
+
+void print_bytes(char* name, char* ptr, int num_bytes) {
+
+	printf("%s (%i bytes): ", name, num_bytes);
+	for(int i=0; i<num_bytes; i++) {
+		printf("%02x ", (unsigned char) ptr[i]);
+	}
+	printf("\n");
+
+}
+
+void print_uint(char* name, uint32_t* ptr, int num_elem) {
+
+	printf("%s (%i %i-byte elements): ", name, num_elem, WORD_SIZE/8);
+	for(int i=0; i<num_elem; i++) {
+		printf("%04x ", (unsigned char) ptr[i]);
+	}
+	printf("\n");
+
+}
 
 void parse_input(char* file) {
 
@@ -99,25 +122,36 @@ void parse_input(char* file) {
 	key = (char*) malloc(256);
 	memset(key, 0, 256);
 	key_size = 0;
+		
+	L = (uint32_t*) malloc(sizeof(256)/sizeof(uint32_t)); // holds groups of bytes of size WORD_SIZE in little-endian format, with the zero padding
+	int L_size = 0;
+	memset(L, 0, 256);
+	uint32_t mask;
+	// read each byte
 	for(int i=0; i<hex_string_size/2; i++) {
 		sscanf(pos, "%2hhx", &key[i]);
-        	pos += 2;
+        	mask = 0x00000000; // reset mask
+		mask |= key[i]; // mask = 0x 00 00 00 <key>
+		mask << 8 * (i%4); // mask = 0x00 <key> 00 00 ; shift left 8*2 = 16 times
+		L[i % 4] |= mask; // L[pos] = 0x<b2> <key> <b1> <b0>
+		pos += 2;
 		key_size++;
 	}
 
 	fclose(input);
-
+	L_size = ceil(key_size/(WORD_SIZE/8));
+	
 	// debug
-	printf("Text (%i bytes): ", text_size);
-	for(int i=0; i<text_size; i++) {
-		printf("%02x ", text[i]);
-	}
-	printf("\nKey (%i bytes): ", key_size);
-	for(int i=0; i<key_size; i++) {
-		printf("%02x ", key[i]);
-	}
-	printf("\n");
+	print_bytes("Text", text, text_size);
+	print_bytes("Key", key, key_size);
+	print_uint("L", L, L_size);
+}
 
+void run_key_schedule() {
+
+	printf("run_key_schedule()\n");
+
+	printf("run_key_schedule() completed.\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -129,6 +163,8 @@ int main(int argc, char* argv[]) {
 
 	printf("RC6-32/20/b\n");
 	parse_input(argv[1]); // obtain text and user key	
+
+	run_key_schedule(); // generates 2r + 4 keys in round_keys[]
 	
 	return 0;
 }
