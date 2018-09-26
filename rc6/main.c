@@ -59,7 +59,7 @@ void print_uint(char* name, uint32_t* ptr, int num_elem) {
 
 	printf("%s (%i %i-byte elements): ", name, num_elem, WORD_SIZE/8);
 	for(int i=0; i<num_elem; i++) {
-		printf("%08x ", ptr[i]);
+		printf("%08x ", (uint32_t) ptr[i]);
 	}
 	printf("\n");
 
@@ -158,16 +158,23 @@ uint32_t shiftl(uint32_t a, uint32_t b) {
 	return a << s;
 }
 
+uint32_t mod(uint32_t val) {
+	return val % (unsigned long long) pow(2, WORD_SIZE);
+}
+
 void run_key_schedule() {
 
 	printf("run_key_schedule()\n");
 
 	memset(round_keys, 0, (2*NUM_ROUNDS + 4)*sizeof(uint32_t));	
-	round_keys[0] = P32;
+	memset(L, 0, L_size*sizeof(uint32_t));
 	
+	round_keys[0] = P32;	
 	for(int i=1; i<=2*NUM_ROUNDS+3; i++) {
-		round_keys[i] = round_keys[i-1] + Q32;
+		round_keys[i] = mod(round_keys[i-1] + Q32);
 	}
+	
+	//print_uint("Round keys before", round_keys, 2*NUM_ROUNDS + 4);
 
 	int i=0, j=0;
 	regs[REG_A] = 0x00000000;
@@ -179,10 +186,10 @@ void run_key_schedule() {
 
 	for(int s=1; s<=v; s++) {
 	
-		round_keys[i] = shiftl(round_keys[i] + regs[REG_A] + regs[REG_B], 3);
+		round_keys[i] = shiftl( mod(round_keys[i] + regs[REG_A] + regs[REG_B]), 3);
 		regs[REG_A] = round_keys[i];
 		
-		L[j] = shiftl(L[j] + regs[REG_A] + regs[REG_B], regs[REG_A] + regs[REG_B]);
+		L[j] = shiftl( mod(L[j] + regs[REG_A] + regs[REG_B]), mod(regs[REG_A] + regs[REG_B]) );
 		regs[REG_B] = L[j];
 	
 		i = (i+1) % (2*NUM_ROUNDS + 4);
@@ -194,7 +201,7 @@ void run_key_schedule() {
 	regs[REG_A] = 0x00000000;
 	regs[REG_B] = 0x00000000;
 
-	//print_uint("After key schedule", round_keys, 2*NUM_ROUNDS + 4);
+//	print_uint("After key schedule", round_keys, 2*NUM_ROUNDS + 4);
 	//printf("run_key_schedule() completed.\n");
 }
 
@@ -214,15 +221,16 @@ void partition(unsigned char* text) {
 void encrypt() {
 	printf("encrypt()\n");
 
-	regs[REG_B] = regs[REG_B] + round_keys[0];
-	regs[REG_D] = regs[REG_D] + round_keys[1];
+	regs[REG_B] = mod(regs[REG_B] + round_keys[0]); 
+	regs[REG_D] = mod(regs[REG_D] + round_keys[1]);
 
 	int logw = log2(WORD_SIZE);
 	for(int i=1; i<=NUM_ROUNDS; i++) {
-		uint32_t t = shiftl(regs[REG_B] * (2*regs[REG_B] + 1), logw);
-		uint32_t u = shiftl(regs[REG_D] * (2*regs[REG_D] + 1), logw);
-		regs[REG_A] = ( shiftl(regs[REG_A] ^ t, u) ) + round_keys[2*i];
-		regs[REG_C] = ( shiftl(regs[REG_C] ^ u, t) + round_keys[2*i + 1]);
+
+		uint32_t t = shiftl( mod(regs[REG_B] * (2*regs[REG_B] + 1)), logw);
+		uint32_t u = shiftl( mod(regs[REG_D] * (2*regs[REG_D] + 1)), logw);
+		regs[REG_A] = mod(shiftl(regs[REG_A] ^ t, u) + round_keys[2*i]);
+		regs[REG_C] = mod(shiftl(regs[REG_C] ^ u, t) + round_keys[2*i + 1]);
 
 		uint32_t old_regs[4];
 		old_regs[REG_A] = regs[REG_A];
@@ -234,10 +242,11 @@ void encrypt() {
 		regs[REG_B] = old_regs[REG_C];
 		regs[REG_C] = old_regs[REG_D];
 		regs[REG_D] = old_regs[REG_A];
+
 	}
 
-	regs[REG_A] = regs[REG_A] + round_keys[2*NUM_ROUNDS + 2];
-	regs[REG_C] = regs[REG_C] + round_keys[2*NUM_ROUNDS + 3];
+	regs[REG_A] = mod(regs[REG_A] + round_keys[2*NUM_ROUNDS + 2]);
+	regs[REG_C] = mod(regs[REG_C] + round_keys[2*NUM_ROUNDS + 3]);
 
 	print_uint("Encrypted", regs, 4);
 }
