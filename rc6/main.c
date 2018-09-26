@@ -45,6 +45,19 @@ const uint32_t Q32 = 0x9E3779B9; // "magical constant"
 
 */
 
+void print_bits(uint32_t val, int num_bits) {
+	
+	printf("%08x = ", val);
+	uint32_t mask;
+	for(int i=num_bits-1; i>=0; i--) {
+		mask = 1 << i;
+		if(val & mask) printf("1");
+		else printf("0");
+		if(i % 4 == 0) printf(" ");	
+	}
+	printf("\n");
+}
+
 void print_bytes(char* name, char* ptr, int num_bytes) {
 
 	printf("%s (%i bytes): ", name, num_bytes);
@@ -150,12 +163,23 @@ void parse_input(char* file) {
 	print_uint("L", L, L_size);
 }
 
-// shifts a to the left by the amount given by the least significant log2(WORD_SIZE) bits
-uint32_t shiftl(uint32_t a, uint32_t b) {
+// ROTATES a to the left by the amount given by the least significant log2(WORD_SIZE) bits
+uint32_t rotatel(uint32_t a, uint32_t b) {
 
-	int s = b & ~(0xFFFFFE00); // extract the log2(WORD_SIZE) = 5 least significant bits
-	//printf("a: %08x, b: %08x, shift a to the left by %i (%06x)\n", a, b, s, s);
-	return a << s;
+	int s = b & ~(0xFFFFFFE0); // extract the log2(WORD_SIZE) = 5 least significant bits
+//	printf("a: %08x, b: %08x, ROTATE a to the left by %i bits (%06x)\n", a, b, s, s);	
+	uint32_t mask;
+//	print_bits(a, 32);
+	for(int i=0; i<s; i++) {
+		// read the most significant BIT and move it to the least significant bit
+		mask = (a & ~(0x7FFFFFFF)) >> 31;
+		a = a << 1; // move to the left by 1 bit
+		a |= mask; // write buf to the least significant bit
+//		printf("%i) ", i);
+//		print_bits(a, 32);
+	}
+//	printf("%08x\n", a);
+	return a;
 }
 
 uint32_t mod(uint32_t val) {
@@ -186,10 +210,10 @@ void run_key_schedule() {
 
 	for(int s=1; s<=v; s++) {
 	
-		round_keys[i] = shiftl( mod(round_keys[i] + regs[REG_A] + regs[REG_B]), 3);
+		round_keys[i] = rotatel( mod(round_keys[i] + regs[REG_A] + regs[REG_B]), 3);
 		regs[REG_A] = round_keys[i];
 		
-		L[j] = shiftl( mod(L[j] + regs[REG_A] + regs[REG_B]), mod(regs[REG_A] + regs[REG_B]) );
+		L[j] = rotatel( mod(L[j] + regs[REG_A] + regs[REG_B]), mod(regs[REG_A] + regs[REG_B]) );
 		regs[REG_B] = L[j];
 	
 		i = (i+1) % (2*NUM_ROUNDS + 4);
@@ -227,10 +251,10 @@ void encrypt() {
 	int logw = log2(WORD_SIZE);
 	for(int i=1; i<=NUM_ROUNDS; i++) {
 
-		uint32_t t = shiftl( mod(regs[REG_B] * (2*regs[REG_B] + 1)), logw);
-		uint32_t u = shiftl( mod(regs[REG_D] * (2*regs[REG_D] + 1)), logw);
-		regs[REG_A] = mod(shiftl(regs[REG_A] ^ t, u) + round_keys[2*i]);
-		regs[REG_C] = mod(shiftl(regs[REG_C] ^ u, t) + round_keys[2*i + 1]);
+		uint32_t t = rotatel( mod(regs[REG_B] * (2*regs[REG_B] + 1)), logw);
+		uint32_t u = rotatel( mod(regs[REG_D] * (2*regs[REG_D] + 1)), logw);
+		regs[REG_A] = mod(rotatel(regs[REG_A] ^ t, u) + round_keys[2*i]);
+		regs[REG_C] = mod(rotatel(regs[REG_C] ^ u, t) + round_keys[2*i + 1]);
 
 		uint32_t old_regs[4];
 		old_regs[REG_A] = regs[REG_A];
