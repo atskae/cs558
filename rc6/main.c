@@ -6,6 +6,8 @@
 #include <string.h> 
 #include <math.h>
 
+#include <time.h> // rand()
+
 /*
 
 	RC6 components
@@ -34,7 +36,7 @@ uint32_t regs[4] = { 0x00000000, 0x00000000, 0x00000000, 0x00000000};
 // Key schedule for RC6
 uint32_t round_keys[2*NUM_ROUNDS + 4]; // S array from paper
 uint32_t* L; // user-key with zero-byte padding in array format, little-endian format
-int L_size;
+uint32_t L_size;
 const uint32_t P32 = 0xB7E15163; // "magical constant"
 const uint32_t Q32 = 0x9E3779B9; // "magical constant"
 
@@ -45,9 +47,9 @@ const uint32_t Q32 = 0x9E3779B9; // "magical constant"
 
 */
 
-void print_bits(uint32_t val, int num_bits) {
+void print_bits(char* name, uint32_t val, int num_bits) {
 	
-	printf("%08x = ", val);
+	printf("(%s) %08x = ", name, val);
 	uint32_t mask;
 	for(int i=num_bits-1; i>=0; i--) {
 		mask = 1 << i;
@@ -166,66 +168,86 @@ void parse_input(char* file) {
 // ROTATES a to the left by the amount given by the least significant log2(WORD_SIZE) bits
 uint32_t rotatel(uint32_t a, uint32_t b) {
 
-	int s = b & ~(0xFFFFFFE0); // extract the log2(WORD_SIZE) = 5 least significant bits
-//	printf("a: %08x, b: %08x, ROTATE a to the left by %i bits (%06x)\n", a, b, s, s);	
+	uint32_t s = b & ~(0xFFFFFFE0); // extract the log2(WORD_SIZE) = 5 least significant bits
+	//printf("a: %u, b: %u, ROTATE a to the left by %i bits (%06x)\n", a, b, s, s);	
 	uint32_t mask;
-//	print_bits(a, 32);
-	for(int i=0; i<s; i++) {
+	//print_bits("a", a, 32);
+	//print_bits("b", b, 32);
+	//print_bits("s", s, 32);
+	
+	for(uint32_t i=0; i<s; i++) {
 		// read the most significant BIT and move it to the least significant bit
-		mask = (a & ~(0x7FFFFFFF)) >> 31;
+		mask = (a & ~(0x7FFFFFFF)) >> (WORD_SIZE - 1);
+		//print_bits("most sig bit", mask, 32);	
 		a = a << 1; // move to the left by 1 bit
+		//print_bits("after shift by 1 bit left", a, 32);	
 		a |= mask; // write buf to the least significant bit
-//		printf("%i) ", i);
-//		print_bits(a, 32);
+		//printf("%i) ", i);
+		//print_bits("a", a, 32);
 	}
-//	printf("%08x\n", a);
+	//print_bits("after rotate", a, 32);	
+	//printf("\n\n");	
+	
 	return a;
 }
 
-uint32_t mod(uint32_t val) {
-	return val % (unsigned long long) pow(2, WORD_SIZE);
+// ROTATES a to the right by the amount given by the least significant log2(WORD_SIZE) bits
+uint32_t rotater(uint32_t a, uint32_t b) {
+
+	uint32_t s = b & ~(0xFFFFFFE0); // extract the log2(WORD_SIZE) = 5 least significant bits
+	//printf("a: %u, b: %u, ROTATE a to the right by %i bits (%06x)\n", a, b, s, s);	
+	uint32_t mask;
+	//print_bits("a", a, 32);
+	//print_bits("b", b, 32);
+	//print_bits("s", s, 32);
+	
+	for(uint32_t i=0; i<s; i++) {
+		// read the least significant BIT and move it to the most significant bit
+		mask = (a & ~(0xFFFFFFFE)) << (WORD_SIZE - 1);
+		//print_bits("most sig bit", mask, 32);	
+		a = a >> 1; // move to the right by 1 bit
+		//print_bits("after shift by 1 bit left", a, 32);	
+		a |= mask; // write buf to the most significant bit
+		//printf("%i) ", i);
+		//print_bits("a", a, 32);
+	}
+	//print_bits("after rotate", a, 32);	
+	//printf("\n\n");	
+	
+	return a;
 }
+
+//uint32_t mod(uint32_t val) {
+//	return val % (unsigned long long) pow(2, WORD_SIZE);
+//}
 
 void run_key_schedule() {
 
-	printf("run_key_schedule()\n");
-
-	memset(round_keys, 0, (2*NUM_ROUNDS + 4)*sizeof(uint32_t));	
-	memset(L, 0, L_size*sizeof(uint32_t));
-	
+	//printf("\n\nrun_key_schedule()\n");	
 	round_keys[0] = P32;	
-	for(int i=1; i<=2*NUM_ROUNDS+3; i++) {
-		round_keys[i] = mod(round_keys[i-1] + Q32);
+	for(uint32_t i=1; i<=2*NUM_ROUNDS+3; i++) {	
+		round_keys[i] = round_keys[i-1] + Q32;
 	}
 	
-	//print_uint("Round keys before", round_keys, 2*NUM_ROUNDS + 4);
+	uint32_t i=0, j=0, A=0, B=0;		
 
-	int i=0, j=0;
-	regs[REG_A] = 0x00000000;
-	regs[REG_B] = 0x00000000;
-
-	int max = 2*NUM_ROUNDS + 4;
+	uint32_t max = 2*NUM_ROUNDS + 4;
 	if(L_size > max) max = L_size;
-	int v = 3 * max;
-
-	for(int s=1; s<=v; s++) {
+	uint32_t v = 3 * max;
 	
-		round_keys[i] = rotatel( mod(round_keys[i] + regs[REG_A] + regs[REG_B]), 3);
-		regs[REG_A] = round_keys[i];
-		
-		L[j] = rotatel( mod(L[j] + regs[REG_A] + regs[REG_B]), mod(regs[REG_A] + regs[REG_B]) );
-		regs[REG_B] = L[j];
+	for(uint32_t s=1; s<=v; s++) {
+
+		round_keys[i] = rotatel( round_keys[i] + A + B, 3);
+		A = round_keys[i];
+	
+		L[j] = rotatel( L[j] + A + B, A + B);
+		B = L[j];
 	
 		i = (i+1) % (2*NUM_ROUNDS + 4);
 		j = (j+1) % L_size;
-
 	}
 
-	// reset the values
-	regs[REG_A] = 0x00000000;
-	regs[REG_B] = 0x00000000;
-
-//	print_uint("After key schedule", round_keys, 2*NUM_ROUNDS + 4);
+	print_uint("After key schedule", round_keys, 2*NUM_ROUNDS + 4);
 	//printf("run_key_schedule() completed.\n");
 }
 
@@ -244,17 +266,19 @@ void partition(unsigned char* text) {
 
 void encrypt() {
 	printf("encrypt()\n");
+	printf("A=%08x, B=%08x, C=%08x, D=%08x\n", regs[REG_A], regs[REG_B], regs[REG_C], regs[REG_D]);
 
-	regs[REG_B] = mod(regs[REG_B] + round_keys[0]); 
-	regs[REG_D] = mod(regs[REG_D] + round_keys[1]);
+	regs[REG_B] = regs[REG_B] + round_keys[0]; 
+	regs[REG_D] = regs[REG_D] + round_keys[1];
 
-	int logw = log2(WORD_SIZE);
+	uint32_t logw = log2(WORD_SIZE);
+	printf("logw %u\n", logw);
 	for(int i=1; i<=NUM_ROUNDS; i++) {
 
-		uint32_t t = rotatel( mod(regs[REG_B] * (2*regs[REG_B] + 1)), logw);
-		uint32_t u = rotatel( mod(regs[REG_D] * (2*regs[REG_D] + 1)), logw);
-		regs[REG_A] = mod(rotatel(regs[REG_A] ^ t, u) + round_keys[2*i]);
-		regs[REG_C] = mod(rotatel(regs[REG_C] ^ u, t) + round_keys[2*i + 1]);
+		uint32_t t = rotatel( regs[REG_B] * (2*regs[REG_B] + 1), logw);
+		uint32_t u = rotatel( regs[REG_D] * (2*regs[REG_D] + 1), logw);
+		regs[REG_A] = rotatel(regs[REG_A] ^ t, u) + round_keys[2*i];
+		regs[REG_C] = rotatel(regs[REG_C] ^ u, t) + round_keys[2*i + 1];
 
 		uint32_t old_regs[4];
 		old_regs[REG_A] = regs[REG_A];
@@ -269,17 +293,49 @@ void encrypt() {
 
 	}
 
-	regs[REG_A] = mod(regs[REG_A] + round_keys[2*NUM_ROUNDS + 2]);
-	regs[REG_C] = mod(regs[REG_C] + round_keys[2*NUM_ROUNDS + 3]);
-
+	regs[REG_A] = regs[REG_A] + round_keys[2*NUM_ROUNDS + 2];
+	regs[REG_C] = regs[REG_C] + round_keys[2*NUM_ROUNDS + 3];
+	
 	print_uint("Encrypted", regs, 4);
 }
 
-
 void decrypt() {
-	printf("decrypt()\n");
-}
+	printf("decrypt()\n");	
+	printf("ciphertext: A = %08x, B = %08x, C = %08x, D = %08x\n", regs[REG_A], regs[REG_B], regs[REG_C], regs[REG_D]);
+	print_uint("Round keys", round_keys, 2*NUM_ROUNDS + 4);
 
+	printf("%u - %u = ", regs[REG_C], round_keys[2*NUM_ROUNDS+3]);
+	regs[REG_C] = regs[REG_C] - round_keys[2*NUM_ROUNDS + 3];
+	printf("%u\n", regs[REG_C]);	
+	regs[REG_A] = regs[REG_A] - round_keys[2*NUM_ROUNDS + 2];
+
+	uint32_t logw = log2(WORD_SIZE);
+	for(uint32_t i=NUM_ROUNDS; i>=1; i--) {
+
+		uint32_t old_regs[4];
+		old_regs[REG_A] = regs[REG_A];
+		old_regs[REG_B] = regs[REG_B];
+		old_regs[REG_C] = regs[REG_C];
+		old_regs[REG_D] = regs[REG_D];
+	
+		// parallel assignment	
+		regs[REG_A] = old_regs[REG_D];
+		regs[REG_B] = old_regs[REG_A];
+		regs[REG_C] = old_regs[REG_B];
+		regs[REG_D] = old_regs[REG_C];
+
+		uint32_t u = rotatel(regs[REG_D] * (2*regs[REG_D]+1), logw);
+		uint32_t t = rotatel(regs[REG_B] * (2*regs[REG_B]+1), logw);	
+		regs[REG_C] = rotater(regs[REG_C] - round_keys[2*i+1], t) ^ u;
+		regs[REG_A] = rotater(regs[REG_A] - round_keys[2*i], u) ^ t;
+	
+	}
+
+	regs[REG_D] = regs[REG_D] - round_keys[1];
+	regs[REG_B] = regs[REG_B] - round_keys[0];
+	
+	printf("after decryption: A = %08x, B = %08x, C = %08x, D = %08x\n", regs[REG_A], regs[REG_B], regs[REG_C], regs[REG_D]);
+}
 
 int main(int argc, char* argv[]) {
 
@@ -288,11 +344,24 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}	
 
+//	srand(time(NULL));
+//	uint32_t a = rand();
+//	uint32_t b = rand();
+//	printf("%u + %u = %u\n", a, b, mod(a+b));
+//	printf("%u - %u = %u\n", a, b, mod(a-b));
+//	printf("%08x XOR %08x = %08x\n", a, b, mod(a^b));
+//	printf("%u * %u = %u\n", a, b, mod(a*b));
+//	printf("%08x <<< %08x = %08x\n", a, b, rotatel(a,b));
+//	print_bits("a", a, 32);
+//	print_bits("b", b, 32);
+//	print_bits("rotate(a by b)", rotatel(a,b), 32);
+//	
+//
 	printf("RC6-32/20/b\n");
 	parse_input(argv[1]); // obtain text and user key	
 
 	run_key_schedule(); // generates 2r + 4 keys in round_keys[]
-	partition(text); // partition plaintext or cipher text into the 4 registers in little-endian format	
+	partition(text); // partitions plaintext or cipher text into the 4 registers in little-endian format	
 	
 	if(action == ENCRYPT) encrypt();
 	else decrypt();
