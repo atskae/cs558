@@ -89,8 +89,20 @@ void* fs_decrypt(void* ciphertext, int bufsize, char* keystr, int* resultlen) {
 	// BF_cbc_encrypt(const unsigned char *in, unsigned char *out, long length, BF_KEY *schedule, unsigned char *ivec, int enc);	
 	BF_cbc_encrypt(result, result, bufsize, &key, iv, BF_DECRYPT);
 
-	print_buf("decrypted", result, bufsize);
-	*resultlen = bufsize;
+	// remove padding
+	int pad_n = result[bufsize - 1]; // the last byte should give us how many padding bytes were used
+	char true_pad = 1;
+	for(int i=bufsize-1; i>bufsize-pad_n; i--) {
+		if(result[i] != pad_n) {
+			true_pad = 0;	
+			break;
+		}
+	}
 
-	return NULL;
+	if(true_pad) *resultlen = bufsize - pad_n;
+	else *resultlen = bufsize;
+ 
+	print_buf("decrypted", result, *resultlen);
+
+	return result;
 }
