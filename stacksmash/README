@@ -1,0 +1,38 @@
+Atsuko Shimizu
+ashimiz1@binghamton.edu
+
+How an Exploit String is Created
+
+I use three pieces of information to craft an exploit string:
+1. The address of the target function
+2. The starting address of buf[]
+3. The address where the return address is stored on the stack
+
+All three pieces of information can be obtained by running the vulnerable program through gdb.
+
+The stack contents in function prompt() are as follows:
+| arg n		| 0xFF...
+| arg n-1	|
+| ...	  	|
+| arg 0	  	|	ebp + 8
+| return addr	| 	ebp + 4
+| old ebp	| <---	ebp
+| local var 0	|	ebp - 4
+| local var 1	|	ebp - 8
+| ...		|
+| buf[0]	|
+|...		| 0x00...
+
+(The stack grows downwards)
+
+The length of the attack string is: ((address of where return address is stored - address of buf[]) + 4
+This ensures that even if there are other local variables present, it would not matter.
+The +4 is the space to store the target function address (which is assumed to be a 32-bit address).
+
+Initially I fill the attack string with garbage. As long as there are no null bytes, the garbage can be anything.
+I fill the last 4 bytes of the attack string with the target function address in reverse-byte order,
+since this is a little-endian machine.
+
+When the attack string floods the stack, buf[] is stored with garbage and the return address is overwritten
+with the address to the target function. Since the target function calls exit(0), there is no segmentation fault,
+even though we corrupted the stack values.

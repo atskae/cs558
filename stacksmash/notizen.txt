@@ -1,0 +1,40 @@
+Notizen
+
+1. Figure out which function calls gets().
+	a) If there is no information on the source code (do not know where gets() is called), disassemble the binary:
+	objdump -D <binary name> > <output file>
+
+	b) Search for '<main>' in the disassembly (<output file> from above).
+	From the main function, try to follow the control flow until gets() is called.
+	It looks like to call gets(), a call instruction to "_IO_gets" is executed.
+
+	Keep note of which function calls gets(). Let's call that function f.
+
+2. Start gdb with prog. Create a breakpoint at function f. Run the program.
+
+3. Should be in function f at this point. Need the following information:
+	a) Target address (the function we want to go to after the buffer overflow)
+		(gdb) info address <target function name>
+
+	b) Address on the stack where the return address is stored.
+		(gdb) info frame
+		// Look under "saved regisers" and note where eip is saved on the stack.
+		// This is where the return instruction is stored. We need to overwrite this.	
+	
+	c) Address of buf[]
+		(gdb) disas
+		// The argument to gets() is the address of the buffer. Set a breakpoint when gets() is called, and
+		// examine the register contents. Register eax has the address of buf[] because it was pushed onto the
+		// stack before gets() was called. Function arguments are pushed onto the stack prior to the function call.
+		
+	// Exit gdb.
+
+4. Run the exploit program to generate the attack string using the information obtained from step 3.
+	./exploit <target function address> <buffer start address> <address of return address>
+	
+	// attack.input should be generated
+
+5. Attack the program!
+	./prog < attack.input
+
+	// Should see the print statement in the target function.	
