@@ -9,11 +9,16 @@ void geheimnis() {
 void prompt() {
 	float garbage = 0.56;
 	float mull = 5.50006;
-	char buf[1000];
+	char buf[2001];
 	int b = 9;
 	int a = b + 8;	
 	gets(buf);
 	printf("You entered: %s\n", buf);
+}
+
+void pikachu() {
+	printf("Pika!!!!\n");
+	exit(0);
 }
 
 void fakeprompt() {

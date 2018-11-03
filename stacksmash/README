@@ -1,6 +1,20 @@
 Atsuko Shimizu
 ashimiz1@binghamton.edu
 
+To build the vulnerable program and attack string generator, run:
+make
+
+To examine the vulnerable program through gdb, run:
+gdb prog
+
+To generate an attack string, run:
+./exploit <target function address> <buffer start address> <address of return address>
+
+To attack the vulnerable program, run:
+./prog < attack.input
+
+--
+
 How an Exploit String is Created
 
 I use three pieces of information to craft an exploit string:
@@ -20,12 +34,12 @@ The stack contents in function prompt() are as follows:
 | local var 0	|	ebp - 4
 | local var 1	|	ebp - 8
 | ...		|
-| buf[0]	|
+| buf		|
 |...		| 0x00...
 
 (The stack grows downwards)
 
-The length of the attack string is: ((address of where return address is stored - address of buf[]) + 4
+The length of the attack string is: (address of where return address is stored - address of buf[]) + 4
 This ensures that even if there are other local variables present, it would not matter.
 The +4 is the space to store the target function address (which is assumed to be a 32-bit address).
 

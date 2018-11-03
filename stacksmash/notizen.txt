@@ -26,7 +26,7 @@ Notizen
 		// The argument to gets() is the address of the buffer. Set a breakpoint when gets() is called, and
 		// examine the register contents. Register eax has the address of buf[] because it was pushed onto the
 		// stack before gets() was called. Function arguments are pushed onto the stack prior to the function call.
-		
+		// (32-bit calling convetion!! 64-bit is different)	
 	// Exit gdb.
 
 4. Run the exploit program to generate the attack string using the information obtained from step 3.
@@ -37,4 +37,4 @@ Notizen
 5. Attack the program!
 	./prog < attack.input
 
-	// Should see the print statement in the target function.	
+	// Should see the print statement in the target function. Hopefully... .. .	
