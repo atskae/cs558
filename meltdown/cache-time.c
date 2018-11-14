@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
 		start = __rdtscp(&junk); // read time stamp before the memory read
 		junk = *addr; // read value
 		total_cycles = __rdtscp(&junk) - start;	
-		printf("Access time for probe_array[%i * %i]: %llu CPU cycles.\n", i, PAGE_SIZE, total_cycles);
+		printf("Access time for probe_array[%i * %i]: %lu CPU cycles.\n", i, PAGE_SIZE, total_cycles);
 	}
 
 	return 0;
