@@ -54,7 +54,7 @@ void reload_array() {
 	}
 
 	if(guess == secret) correct++;
-	printf("Guessed secret value: %i\n", guess);
+	printf("Guessed secret value: %c\n", guess);
 
 }
 
@@ -72,6 +72,7 @@ int main(int argc, char* argv[]) {
 		reload_array(); // bring in all probe_array elements into the cache and time each access
 	}
 
+	printf("Secret byte: %c\n", secret);
 	printf("Correct %i out of %i iterations (%.2f%% correct)\n", correct, ITER_N, (float)correct/ITER_N * 100);
 	
 	return 0;
