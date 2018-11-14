@@ -13,6 +13,7 @@
 #include <linux/kernel.h> // printk macros
 #include <linux/fs.h> // file_operations
 #include <linux/proc_fs.h> // to create /proc files
+#include <linux/seq_file.h> // single_open()
 
 #include "kernel-meltdown.h"
 
@@ -20,10 +21,10 @@
 static struct proc_dir_entry* Secret_Proc_File; // where user-level programs communicate with this module
 
 static struct file_operations fops = {
-	.read = device_read
-	//.write = device_write,
-	//.open = device_open,
-	//.release = devce_release
+	.read = proc_read,
+	//.write = proc_write,
+	.open = proc_open,
+	//.release = proc_release
 };
 
 #define SECRET_BYTES_N 10
@@ -59,9 +60,13 @@ void cleanup_module(void) {
 }
 
 /*
-	Character device methods ; function prototypes defined in linux/fs.h
+	/proc file methods ; function prototypes defined in linux/fs.h
 */
-static ssize_t device_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset) {
+static int proc_open(struct inode* inode, struct file* file) {
+	return single_open(file, NULL, PDE_DATA(inode)); // returns the data in file
+}
+
+static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset) {
 	memcpy(secret_buffer, &secret, SECRET_BYTES_N); // only send the address to user ; not the secret value
 	return SECRET_BYTES_N;
 }
