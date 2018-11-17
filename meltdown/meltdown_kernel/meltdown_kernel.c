@@ -14,6 +14,7 @@
 #include <linux/fs.h> // file_operations
 #include <linux/proc_fs.h> // to create /proc files
 #include <linux/seq_file.h> // single_open()
+#include <linux/vmalloc.h>
 
 #include "meltdown_kernel.h"
 
