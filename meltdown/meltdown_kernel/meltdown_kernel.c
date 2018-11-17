@@ -15,7 +15,7 @@
 #include <linux/proc_fs.h> // to create /proc files
 #include <linux/seq_file.h> // single_open()
 
-#include "kernel-meltdown.h"
+#include "meltdown_kernel.h"
 
 #define PROC_NAME "secret_data"
 static struct proc_dir_entry* Secret_Proc_File; // where user-level programs communicate with this module
@@ -67,6 +67,6 @@ static int proc_open(struct inode* inode, struct file* file) {
 }
 
 static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset) {
-	memcpy(secret_buffer, &secret, SECRET_BYTES_N); // only send the address to user ; not the secret value
+	memcpy(secret_buffer, &secret, SECRET_BYTES_N); // copies secret to another kernel buffer ; not to user 
 	return SECRET_BYTES_N;
 }

