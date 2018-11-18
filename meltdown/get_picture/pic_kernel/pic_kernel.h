@@ -1,5 +1,5 @@
-#ifndef MELTDOWN_KERNEL_H
-#define MELTDOWN_KERNEL_H
+#ifndef PIC_KERNEL_H
+#define PIC_KERNEL_H
 
 #include <linux/module.h> // needed by all kernel modules
 #include <linux/kernel.h> // printk macros
@@ -13,5 +13,6 @@ void cleanup_module(void);
 // /proc functions
 static int proc_open(struct inode* inode, struct file* file);
 static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset);
+static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t buffer_size, loff_t* offset);
 
-#endif // MELTDOWN_KERNEL_H
+#endif // PIC_KERNEL_H
