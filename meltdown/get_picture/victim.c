@@ -1,22 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h> // for open
+#include <unistd.h>
 
 #define BYTES_PER_LINE 32
 
 static unsigned char* pic_bytes = NULL;
-static unsigned char* secret_buffer = NULL;
-
-void access_bytes(unsigned char* bytes, int bytes_n) {
-	if(!secret_buffer || !bytes) {
-		printf("No buffer to copy.\n");
-		return;
-	}
-
-	memcpy(secret_buffer, bytes, bytes_n);	
-	printf("Waiting to be attacked...\n");
-	while(1); // waiting to be attacked
-}
 
 void print_bytes(unsigned char* bytes, int bytes_n) {
 	if(!bytes) {
@@ -47,7 +37,7 @@ long read_bytes(char* file) {
 	long bytes_n = ftell(fd); // read the position in the file
 
 	pic_bytes = (unsigned char*) malloc(bytes_n); // allocate a buffer for image bytes
-	printf("Loaded image file (%lu bytes) at address %p\n", bytes_n, pic_bytes); // in real life, the attacker must find this address themselves...
+	printf("Loaded image file (%lu bytes)\n", bytes_n); // in real life, the attacker must find this address themselves...
 
 	rewind(fd); // move to beginning of file
 	fread(pic_bytes, 1, bytes_n, fd); // read file contents
@@ -64,11 +54,20 @@ int main(int argc, char* argv[]) {
 	}
 
 	char* pic_file = argv[1];
-	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes
-	
+	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes	
 	// print_bytes(pic_bytes, bytes_n);
-	secret_buffer = (unsigned char*) malloc(bytes_n);
-	access_bytes(pic_bytes, bytes_n);
+
+	// open kernel /proc file
+	int fd = open("/proc/pic", O_RDWR); // open for reading and writing
+	if(fd < 0) {
+		perror("Failed to open /proc file.\n");
+		return -1;
+	}	
+
+	// write pic_bytes to kernel
+	int ret = pwrite(fd, pic_bytes, bytes_n, 0); // triggers the proc_read() function in kernel to be executed
+	printf("Waiting to be attacked... ret=%i\n", ret);
+	while(1);
 
 	return 0;
 }

