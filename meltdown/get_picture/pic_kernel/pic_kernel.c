@@ -17,9 +17,9 @@
 static struct proc_dir_entry* Proc_File; // where user-level programs communicate with this module
 
 /* Picture file (png, jpeg, ...) from user-level */
-static unsigned char* pic_bytes = NULL;
+static char* pic_bytes = NULL;
 static size_t pic_size = 0; // size in bytes
-static unsigned char* pic_bytes_buffer = NULL; // a place to move picture bytes to, to "access" the bytes
+static char* pic_bytes_buffer = NULL; // a place to move picture bytes to, to "access" the bytes
 
 static struct file_operations fops = {
 	.read = proc_read,
@@ -39,7 +39,7 @@ int init_module(void) { // when kernel module is first loaded
 
 	// create an file in /proc directory ; user-level programs can read this file to interact with this kernel module
 	// /proc: special files created by kernel to send information out to the world ; each /proc file is associated with a kernel function
-	Proc_File = proc_create_data(PROC_NAME, 0444, NULL, &fops, NULL);	
+	Proc_File = proc_create_data(PROC_NAME, 0666, NULL, &fops, NULL); // 0666: rw permissions	
 	if(!Proc_File) {
 		printk(KERN_ALERT "Failed to create /proc file.\n");
 		return -ENOMEM; // out of memory error ; asm/error.h 
@@ -78,7 +78,8 @@ static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_si
 
 static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t buffer_size, loff_t* offset) {	
 
-	unsigned long ret;
+	unsigned long ret;	
+	printk(KERN_ALERT "Preparing to write to kernel.\n");
 	
 	if(pic_bytes && pic_bytes_buffer) {
 		vfree(pic_bytes); // free old picture
@@ -86,6 +87,7 @@ static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t bu
 	}
 	pic_bytes = vmalloc(buffer_size);	
 	pic_bytes_buffer = vmalloc(buffer_size);
+	if(!pic_bytes || !pic_bytes_buffer) printk(KERN_ALERT "Failed to allocate space.\n");
 
 	ret = copy_from_user(pic_bytes, user_buffer, buffer_size);
 	if(ret != 0) {
@@ -94,6 +96,8 @@ static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t bu
 		vfree(pic_bytes_buffer);
 		return -EFAULT;
 	}
-	pic_size = buffer_size;
+	pic_size = buffer_size;	
+	printk(KERN_ALERT "Image size %li bytes ; the last byte: %02x\n", pic_size, pic_bytes[pic_size-1]);
+	
 	return pic_size;
 }

@@ -6,7 +6,7 @@
 
 #define BYTES_PER_LINE 32
 
-static unsigned char* pic_bytes = NULL;
+static char* pic_bytes = NULL;
 
 void print_bytes(unsigned char* bytes, int bytes_n) {
 	if(!bytes) {
@@ -16,7 +16,7 @@ void print_bytes(unsigned char* bytes, int bytes_n) {
 
 	int i;
 	for(i=0; i<bytes_n; i++) {
-		printf("%02x ", bytes[i]);
+		printf("%02x ", (unsigned char) bytes[i]);
 		if(i % BYTES_PER_LINE == 0) printf("\n");
 	}
 	if(bytes_n % BYTES_PER_LINE) printf("\n");
@@ -36,7 +36,7 @@ long read_bytes(char* file) {
 	fseek(fd, 0, SEEK_END); // goes to the end of file
 	long bytes_n = ftell(fd); // read the position in the file
 
-	pic_bytes = (unsigned char*) malloc(bytes_n); // allocate a buffer for image bytes
+	pic_bytes = (char*) malloc(bytes_n); // allocate a buffer for image bytes
 	printf("Loaded image file (%lu bytes)\n", bytes_n); // in real life, the attacker must find this address themselves...
 
 	rewind(fd); // move to beginning of file
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
 
 	char* pic_file = argv[1];
 	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes	
-	// print_bytes(pic_bytes, bytes_n);
+	 //print_bytes(pic_bytes, bytes_n);
 
 	// open kernel /proc file
 	int fd = open("/proc/pic", O_RDWR); // open for reading and writing
@@ -65,7 +65,12 @@ int main(int argc, char* argv[]) {
 	}	
 
 	// write pic_bytes to kernel
-	int ret = pwrite(fd, pic_bytes, bytes_n, 0); // triggers the proc_read() function in kernel to be executed
+	int ret;
+	ret = pwrite(fd, pic_bytes, bytes_n, 0); // triggers the proc_read() function in kernel to be executed
+	if(ret < 0) perror("Writing failed Que paso?\n");
+	ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
+	if(ret < 0) perror("Read failed. Que paso?\n");
+
 	printf("Waiting to be attacked... ret=%i\n", ret);
 	while(1);
 
