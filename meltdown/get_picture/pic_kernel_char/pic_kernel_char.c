@@ -41,7 +41,7 @@ int init_module(void) {
 
 	// kernel logs the address of the secret (not secret value)
 	// in real Meltdown attacks, the attacker must figure out where the secret is themselves (how?)
-	printk(KERN_INFO "Initializing picture module. Picture loadable at %p\n", &pic_bytes);
+	printk(KERN_INFO "Initializing picture module. Major %i. Picture loadable at %p\n", Major, &pic_bytes);
 
 	return 0; // always return 0 on success
 }

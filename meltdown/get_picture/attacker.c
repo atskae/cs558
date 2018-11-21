@@ -57,12 +57,13 @@ int main(int argc, char* argv[]) {
 	}
 	
 	unsigned long addr = strtoul(argv[1], NULL, 16);
+	printf("Got address %p\n", addr);
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
 
 	// open kernel /proc file
-	int fd = open("/proc/pic", O_RDONLY);
+	int fd = open("/dev/pic_kernel_char", O_RDONLY);
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;

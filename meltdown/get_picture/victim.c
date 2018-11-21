@@ -4,7 +4,7 @@
 #include <fcntl.h> // for open
 #include <unistd.h>
 
-#define BYTES_PER_LINE 32
+#define BYTES_PER_LINE 16
 
 static char* pic_bytes = NULL;
 
@@ -17,7 +17,7 @@ void print_bytes(unsigned char* bytes, int bytes_n) {
 	int i;
 	for(i=0; i<bytes_n; i++) {
 		printf("%02x ", (unsigned char) bytes[i]);
-		if(i % BYTES_PER_LINE == 0) printf("\n");
+		if(i != 0 && i % BYTES_PER_LINE == 0) printf("\n");
 	}
 	if(bytes_n % BYTES_PER_LINE) printf("\n");
 	printf("Total bytes: %i\n", bytes_n);
@@ -56,9 +56,10 @@ int main(int argc, char* argv[]) {
 	char* pic_file = argv[1];
 	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes	
 	 //print_bytes(pic_bytes, bytes_n);
+	print_bytes(pic_bytes, 50);
 
 	// open kernel /proc file
-	int fd = open("/proc/pic", O_RDWR); // open for reading and writing
+	int fd = open("/dev/pic_kernel_char", O_RDWR); // open for reading and writing
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;
@@ -72,7 +73,9 @@ int main(int argc, char* argv[]) {
 	if(ret < 0) perror("Read failed. Que paso?\n");
 
 	printf("Waiting to be attacked... ret=%i\n", ret);
-	while(1);
+	while(1) {
+		ret = pread(fd, NULL, 0, 0);	
+	}
 
 	return 0;
 }

@@ -7,7 +7,7 @@
 #include <asm/uaccess.h> // put_user() ; for kernel to write to a user-provided buffer
 
 #define SUCCESS 0
-#define DEVICE_NAME "chardev"
+#define DEVICE_NAME "pic_kernel_char"
 #define BUF_LEN 128
 
 // necessary enter/exit functions of kernel module
