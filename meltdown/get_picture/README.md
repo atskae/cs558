@@ -1,16 +1,16 @@
 # Attempting to Read Bytes from Another Process
 
 ## Build kernel module
-1. Change directory to `pic_kernel_char` and type `make`
+1. Change directory to `pic_kernel` and type `make`
 ```
-cd pic_kernel_char
+cd pic_kernel
 make
 ```
 (Do not build the other directory `pic_kernel`. That is an old, more unfunctional version....)
 
 2. Load the kernel module
 ```
-sudo insmod pic_kernel_char.ko
+sudo insmod pic_kernel.ko
 ```
 pic\_kernel\_char should appear in the list of loaded modules. You can check by typing `lsmod`.
 
@@ -27,8 +27,8 @@ The address printed out is our target address. We want to read bytes from this a
 
 4. Create a device file for this kernel module. Set device file to be readable and writable.
 ```
-sudo mknod /dev/pic_kernel_char c <Major number> 0
-sudo chmod 666 /dev/pic_kernel_char
+sudo mknod /dev/pic_kernel c <Major number> 0
+sudo chmod 666 /dev/pic_kernel
 ```
 
 ## Build victim and attacker programs

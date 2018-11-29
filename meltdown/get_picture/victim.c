@@ -15,12 +15,12 @@ void print_bytes(unsigned char* bytes, int bytes_n) {
 	}
 
 	int i;
-	for(i=0; i<bytes_n; i++) {
-		printf("%02x ", (unsigned char) bytes[i]);
+	for(i=0; i<bytes_n; i++) {	
 		if(i != 0 && i % BYTES_PER_LINE == 0) printf("\n");
+		printf("%02x ", (unsigned char) bytes[i]);
 	}
-	if(bytes_n % BYTES_PER_LINE) printf("\n");
-	printf("Total bytes: %i\n", bytes_n);
+	printf("\n");
+	printf("Printed %i bytes\n", bytes_n);
 }
 
 long read_bytes(char* file) {
@@ -55,11 +55,10 @@ int main(int argc, char* argv[]) {
 
 	char* pic_file = argv[1];
 	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes	
-	 //print_bytes(pic_bytes, bytes_n);
-	print_bytes(pic_bytes, 50);
+	print_bytes(pic_bytes, 16);
 
 	// open kernel /proc file
-	int fd = open("/dev/pic_kernel_char", O_RDWR); // open for reading and writing
+	int fd = open("/dev/pic_kernel", O_RDWR); // open for reading and writing
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;

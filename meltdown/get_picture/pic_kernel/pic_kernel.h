@@ -1,18 +1,23 @@
-#ifndef PIC_KERNEL_H
-#define PIC_KERNEL_H
+#ifndef CHARDEV_H
+#define CHARDEV_H
 
-#include <linux/module.h> // needed by all kernel modules
-#include <linux/kernel.h> // printk macros
-#include <linux/fs.h> // file_operations
-#include <linux/proc_fs.h> // to create /proc files
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/fs.h> // definition of file_operations struct (function ptrs of device functions)
+#include <asm/uaccess.h> // put_user() ; for kernel to write to a user-provided buffer
 
-// required functions by all kernel modules
-int init_module(void); // when kernel module is first loaded
+#define SUCCESS 0
+#define DEVICE_NAME "pic_kernel_char"
+#define BUF_LEN 128
+
+// necessary enter/exit functions of kernel module
+int init_module(void);
 void cleanup_module(void);
 
-// /proc functions
-static int proc_open(struct inode* inode, struct file* file);
-static ssize_t proc_read(struct file* filep, char* user_buffer, size_t buffer_size, loff_t* offset);
-static ssize_t proc_write(struct file* filep, const char* user_buffer, size_t buffer_size, loff_t* offset);
+// device driver functions
+static int device_open(struct inode*, struct file*);
+static int device_release(struct inode*, struct file*);
+static ssize_t device_read(struct file*, char*, size_t, loff_t*); 
+static ssize_t device_write(struct file*, const char*, size_t, loff_t*); 
 
-#endif // PIC_KERNEL_H
+#endif // CHARDEV_H

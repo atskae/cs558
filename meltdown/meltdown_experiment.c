@@ -54,7 +54,7 @@ void probe() {
 
 int main(int argc, char* argv[]) {
 
-	unsigned long kernel_addr = 0xffffffffc03fe000; // address of secret value in kernel space
+	unsigned long kernel_addr = 0xffffffffc01ed000; // address of secret value in kernel space
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
