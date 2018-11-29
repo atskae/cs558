@@ -21,6 +21,10 @@ static unsigned char* pic_bytes = NULL;
 static unsigned char* pic_bytes_buffer = NULL;
 static int pic_size = 0;
 
+/* Number of bytes to obtain from victim ; seeing what the theshold is... If too high, attacker can't read any bytes... */
+static int take_bytes_n = 16;
+module_param(take_bytes_n, int, 0);
+
 // defined in linux/fs.h
 static struct file_operations fops = {
 	.read = device_read,
@@ -41,7 +45,7 @@ int init_module(void) {
 
 	// kernel logs the address of the secret (not secret value)
 	// in real Meltdown attacks, the attacker must figure out where the secret is themselves (how?)
-	printk(KERN_INFO "Initializing picture module. Major %i.\n", Major);
+	printk(KERN_INFO "Initializing picture module. Major %i. take_bytes_n = %i\n", Major, take_bytes_n);
 
 	return 0; // always return 0 on success
 }
@@ -82,7 +86,11 @@ static ssize_t device_read(struct file* filep, char* buffer, size_t length, loff
 		return 0;	
 	}
 
-	memcpy(pic_bytes_buffer, pic_bytes, pic_size); // copies bytes to another kernel buffer ; not to user 
+	printk(KERN_ALERT "device_read: offset I got %i?\n", *offset);
+	//unsigned char c;
+	//if(c < take_bytes_n && pic_bytes) c = pic_bytes[offset]; // access byte
+
+	//memcpy(pic_bytes_buffer, pic_bytes, pic_size); // copies bytes to another kernel buffer ; not to user 
 	return pic_size;
 }
 
@@ -91,15 +99,14 @@ static ssize_t device_read(struct file* filep, char* buffer, size_t length, loff
 static ssize_t device_write(struct file* filep, const char* buffer, size_t buffer_size, loff_t* offset) {
 	
 	unsigned long ret;
-	int i;	
 	printk(KERN_ALERT "Preparing to write to kernel.\n");
 	
 	if(pic_bytes && pic_bytes_buffer) {
 		vfree(pic_bytes); // free old picture
 		vfree(pic_bytes_buffer);
 	}
-
-	buffer_size = 16;
+	
+	buffer_size = take_bytes_n;
 
 	pic_bytes = vmalloc(buffer_size);	
 	pic_bytes_buffer = vmalloc(buffer_size);
@@ -118,13 +125,7 @@ static ssize_t device_write(struct file* filep, const char* buffer, size_t buffe
 	pic_size = buffer_size;
 	
 	printk(KERN_ALERT "Image loaded at %p ; image size %i bytes\n", pic_bytes, pic_size);
-	// debug
-	printk(KERN_ALERT "First 16 bytes: ");
-	for(i=0; i<16; i++) { // print some bytes
-		printk(KERN_ALERT "%02x ", pic_bytes[i]);
-	}
-	printk(KERN_ALERT "\n");
-		
+			
 	return pic_size;
 	
 } 
