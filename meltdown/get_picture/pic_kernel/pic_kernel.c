@@ -21,10 +21,6 @@ static unsigned char* pic_bytes = NULL;
 static unsigned char* pic_bytes_buffer = NULL;
 static int pic_size = 0;
 
-/* Number of bytes to obtain from victim ; seeing what the theshold is... If too high, attacker can't read any bytes... */
-static int take_bytes_n = 16;
-module_param(take_bytes_n, int, 0);
-
 // defined in linux/fs.h
 static struct file_operations fops = {
 	.read = device_read,
@@ -45,7 +41,7 @@ int init_module(void) {
 
 	// kernel logs the address of the secret (not secret value)
 	// in real Meltdown attacks, the attacker must figure out where the secret is themselves (how?)
-	printk(KERN_INFO "Initializing picture module. Major %i. take_bytes_n = %i\n", Major, take_bytes_n);
+	printk(KERN_INFO "Initializing picture module. Major %i\n", Major);
 
 	return 0; // always return 0 on success
 }
@@ -81,14 +77,15 @@ static int device_release(struct inode* inode, struct file* file) {
 
 // called when user attempts to read device file
 static ssize_t device_read(struct file* filep, char* buffer, size_t length, loff_t* offset) {
+	
+	loff_t i = *offset;	
 	if(!pic_bytes) {
 		printk(KERN_ALERT "No picture to read.\n");
 		return 0;	
 	}
 
-	printk(KERN_ALERT "device_read: offset I got %i?\n", *offset);
-	//unsigned char c;
-	//if(c < take_bytes_n && pic_bytes) c = pic_bytes[offset]; // access byte
+	//printk(KERN_ALERT "device_read: offset I got %lld?\n", *offset);
+	if(i < pic_size) pic_bytes_buffer[i] = pic_bytes[i]; // access byte
 
 	//memcpy(pic_bytes_buffer, pic_bytes, pic_size); // copies bytes to another kernel buffer ; not to user 
 	return pic_size;
@@ -106,8 +103,6 @@ static ssize_t device_write(struct file* filep, const char* buffer, size_t buffe
 		vfree(pic_bytes_buffer);
 	}
 	
-	buffer_size = take_bytes_n;
-
 	pic_bytes = vmalloc(buffer_size);	
 	pic_bytes_buffer = vmalloc(buffer_size);
 	if(!pic_bytes || !pic_bytes_buffer) {

@@ -6,7 +6,7 @@
 
 #define BYTES_PER_LINE 16
 
-static char* pic_bytes = NULL;
+static unsigned char* pic_bytes = NULL;
 
 void print_bytes(unsigned char* bytes, int bytes_n) {
 	if(!bytes) {
@@ -36,7 +36,7 @@ long read_bytes(char* file) {
 	fseek(fd, 0, SEEK_END); // goes to the end of file
 	long bytes_n = ftell(fd); // read the position in the file
 
-	pic_bytes = (char*) malloc(bytes_n); // allocate a buffer for image bytes
+	pic_bytes = (unsigned char*) malloc(bytes_n); // allocate a buffer for image bytes
 	printf("Loaded image file (%lu bytes ; %lu KB)\n", bytes_n, bytes_n/1024); 
 
 	rewind(fd); // move to beginning of file
@@ -48,13 +48,14 @@ long read_bytes(char* file) {
 
 int main(int argc, char* argv[]) {
 
-	if(argc != 3) {
+	if(argc != 2 && argc != 3) {
 		printf("./victim <picture file> <num bytes to print>\n");
 		return 1;
 	}
 
 	char* pic_file = argv[1];
-	int read_bytes_n = atoi(argv[2]);
+	int read_bytes_n = 0;
+	if(argv[2]) read_bytes_n = atoi(argv[2]);
 
 	long bytes_n = read_bytes(pic_file); // sets pic_bytes to buffer of image file bytes	
 	print_bytes(pic_bytes, read_bytes_n);
@@ -73,10 +74,8 @@ int main(int argc, char* argv[]) {
 	ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
 	if(ret < 0) perror("Read failed. Que paso?\n");
 
-	printf("Waiting to be attacked... ret=%i\n", ret);
-	while(1) {
-		// ret = pread(fd, NULL, 0, 0);	
-	}
+	printf("Leaving!... ret=%i\n", ret);
+	close(fd);
 
 	return 0;
 }
