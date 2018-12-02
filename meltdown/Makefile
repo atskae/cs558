@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -march=native
 
-all: cache-time flush-reload user exception_handling meltdown_experiment
+all: cache-time flush-reload user exception_handling meltdown_experiment meltdown_experiment2
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -21,5 +21,8 @@ exception_handling: exception_handling.o
 meltdown_experiment: meltdown_experiment.o
 	$(CC) meltdown_experiment.o $(CFLAGS) -o meltdown_experiment 
 
+meltdown_experiment2: meltdown_experiment2.o
+	$(CC) meltdown_experiment2.o $(CFLAGS) -lkdump -o meltdown_experiment2
+
 clean:
-	rm *.o cache-time flush-reload user exception_handling meltdown_experiment
+	rm *.o cache-time flush-reload user exception_handling meltdown_experiment meltdown_experiment2 

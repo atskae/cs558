@@ -74,6 +74,10 @@ int main(int argc, char* argv[]) {
 	ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
 	if(ret < 0) perror("Read failed. Que paso?\n");
 
+	printf("My pid: %i\n", getpid());
+	while(1) {
+	}
+
 	printf("Leaving!... ret=%i\n", ret);
 	close(fd);
 

