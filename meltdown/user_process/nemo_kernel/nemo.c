@@ -1,6 +1,5 @@
 /*
-	https://www.tldp.org/LDP/lkmpg/2.6/html/x569.html#FTN.AEN630
-	Simple character devices that tells user how many times the device file has been read
+	This kernel module just reads a value; nothing is sent out
 */
 
 #include <linux/module.h>
@@ -11,7 +10,7 @@
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 
-#include "pic_kernel.h"
+#include "nemo.h"
 
 /* Global variables defined as static */
 static int Major; // Major number assigned to device driver ; indicates which driver handles which device file

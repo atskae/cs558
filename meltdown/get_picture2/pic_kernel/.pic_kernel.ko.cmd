@@ -1,0 +1,1 @@
+cmd_/home/atsuko/cs558/meltdown/get_picture2/pic_kernel/pic_kernel.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.11.0-15-generic/scripts/module-common.lds --build-id  -o /home/atsuko/cs558/meltdown/get_picture2/pic_kernel/pic_kernel.ko /home/atsuko/cs558/meltdown/get_picture2/pic_kernel/pic_kernel.o /home/atsuko/cs558/meltdown/get_picture2/pic_kernel/pic_kernel.mod.o

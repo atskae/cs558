@@ -37,7 +37,7 @@ long read_bytes(char* file) {
 	long bytes_n = ftell(fd); // read the position in the file
 
 	pic_bytes = (unsigned char*) malloc(bytes_n); // allocate a buffer for image bytes
-	printf("Loaded image file (%lu bytes ; %lu KB)\n", bytes_n, bytes_n/1024); 
+	printf("Loaded image file at %p (%lu bytes ; %lu KB)\n", pic_bytes, bytes_n, bytes_n/1024); 
 
 	rewind(fd); // move to beginning of file
 	fread(pic_bytes, 1, bytes_n, fd); // read file contents
